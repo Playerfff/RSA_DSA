@@ -1,3 +1,4 @@
+#include <cstring>
 #include <iostream>
 #include <openssl/err.h>
 #include <openssl/pem.h>
