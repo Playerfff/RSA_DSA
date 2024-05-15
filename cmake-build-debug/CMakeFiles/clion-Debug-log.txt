@@ -1,0 +1,6 @@
+C:\Windows\system32\wsl.exe --distribution Ubuntu --exec /mnt/d/JetBrains/Toolbox/CLion/bin/ttyfix /bin/bash -c "export PATH=\"/usr/bin:$PATH\" && export CLION_IDE=TRUE && export CMAKE_COLOR_DIAGNOSTICS=ON && export JETBRAINS_IDE=TRUE && cd /mnt/e/projects/CLionProjects/RSA_DSA/cmake-build-debug && /usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -DCMAKE_C_COMPILER=/usr/bin/gcc '-DCMAKE_CXX_COMPILER=/usr/bin/g++' -G Ninja -S /mnt/e/projects/CLionProjects/RSA_DSA -B /mnt/e/projects/CLionProjects/RSA_DSA/cmake-build-debug"
+CMake Error at CMakeLists.txt:1 (cmake_minimum_required):
+  CMake 3.28 or higher is required.  You are running version 3.22.1
+
+
+-- Configuring incomplete, errors occurred!
