@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 project(RSA_DSA)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 # 查找OpenSSL库
 find_package(OpenSSL REQUIRED)
@@ -18,15 +18,25 @@ endif()
 
 set(CMAKE_SKIP_INSTALL_RULES TRUE)
 
+find_package(botan CONFIG REQUIRED)
 
-# 添加可执行文件
 add_executable(rsa_openssl RSA/rsa_openssl.cpp)
-
-# 链接到OpenSSL库
 target_link_libraries(rsa_openssl PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 
-# 添加可执行文件
 add_executable(rsa_cryptopp RSA/rsa_cryptopp.cpp)
-
-# 链接Crypto++库
 target_link_libraries(rsa_cryptopp PRIVATE crypto++)
+
+add_executable(rsa_botan RSA/rsa_botan.cpp)
+target_link_libraries(rsa_botan PRIVATE Botan::Botan-static)
+
+add_executable(dsa_openssl DSA/dsa_openssl.cpp)
+target_link_libraries(dsa_openssl PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+
+add_executable(dsa_cryptopp DSA/dsa_cryptopp.cpp)
+target_link_libraries(dsa_cryptopp PRIVATE crypto++)
+
+add_executable(dsa_botan DSA/dsa_botan.cpp)
+target_link_libraries(dsa_botan PRIVATE Botan::Botan-static)
+
+add_executable(homemade_rsa homemade/rsa.cpp)
+add_executable(homemade_dsa homemade/dsa.cpp)

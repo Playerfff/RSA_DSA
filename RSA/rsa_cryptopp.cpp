@@ -1,96 +1,89 @@
 #include <iostream>
-#include <cryptopp/files.h>
-#include <cryptopp/osrng.h>
-#include <cryptopp/hex.h>
-#include <cryptopp/base64.h>
+
 #include <cryptopp/rsa.h>
+#include <cryptopp/osrng.h>
+#include <cryptopp/base64.h>
 
-// 生成RSA密钥对并保存到文件
-void GenerateAndSaveKeys(const std::string& publicKeyFileName, const std::string& privateKeyFileName) {
-    CryptoPP::AutoSeededRandomPool rng;
+using namespace std;
+using namespace CryptoPP;
 
-    CryptoPP::InvertibleRSAFunction params;
-    params.GenerateRandomWithKeySize(rng, 2048);
 
-    CryptoPP::RSA::PublicKey publicKey(params);
-    CryptoPP::RSA::PrivateKey privateKey(params);
+// 生成RSA密钥对
+void GenerateRSAKeyPair(RSA::PrivateKey& privateKey, RSA::PublicKey& publicKey)
+{
+    AutoSeededRandomPool rng;
 
-    CryptoPP::FileSink pubSink(publicKeyFileName.c_str());
-    publicKey.Save(pubSink);
-    pubSink.MessageEnd();
+    InvertibleRSAFunction parameters;
+    parameters.GenerateRandomWithKeySize(rng, 2048);
 
-    CryptoPP::FileSink privSink(privateKeyFileName.c_str(), true);
-    privateKey.Save(privSink);
-    privSink.MessageEnd();
-}
-
-// 从文件加载RSA密钥
-CryptoPP::RSA::PublicKey LoadPublicKey(const std::string& fileName) {
-    CryptoPP::ByteQueue queue;
-    CryptoPP::FileSource(fileName.c_str(), true, new CryptoPP::Redirector(queue));
-    CryptoPP::RSA::PublicKey publicKey;
-    publicKey.Load(queue);
-    return publicKey;
-}
-
-CryptoPP::RSA::PrivateKey LoadPrivateKey(const std::string& fileName) {
-    CryptoPP::ByteQueue queue;
-    CryptoPP::FileSource(fileName.c_str(), true, new CryptoPP::Redirector(queue));
-    CryptoPP::RSA::PrivateKey privateKey;
-    privateKey.Load(queue);
-    return privateKey;
+    privateKey = RSA::PrivateKey(parameters);
+    publicKey = RSA::PublicKey(parameters);
 }
 
 // RSA加密
-std::string Encrypt(const std::string& plaintext, const CryptoPP::RSA::PublicKey& publicKey) {
-    CryptoPP::AutoSeededRandomPool rng;
-    CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
+std::string RSAEncrypt(const RSA::PublicKey& publicKey, const std::string& plainText)
+{
+    AutoSeededRandomPool rng;
+    RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
 
-    std::string ciphertext;
-    CryptoPP::StringSource(plaintext, true,
-                           new CryptoPP::PK_EncryptorFilter(rng, encryptor,
-                                                            new CryptoPP::StringSink(ciphertext)
-                                                                    ) // PK_EncryptorFilter
-    ); // StringSource
-    return ciphertext;
+    std::string cipherText;
+
+    StringSource(plainText, true,
+                 new PK_EncryptorFilter(rng, encryptor,
+                                        new StringSink(cipherText)
+                                                )
+    );
+
+    return cipherText;
 }
 
 // RSA解密
-std::string Decrypt(const std::string& ciphertext, const CryptoPP::RSA::PrivateKey& privateKey) {
-    CryptoPP::AutoSeededRandomPool rng;
-    CryptoPP::RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
+std::string RSADecrypt(const RSA::PrivateKey& privateKey, const std::string& cipherText)
+{
+    AutoSeededRandomPool rng;
+    RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
 
     std::string recoveredText;
-    CryptoPP::StringSource(ciphertext, true,
-                           new CryptoPP::PK_DecryptorFilter(rng, decryptor,
-                                                            new CryptoPP::StringSink(recoveredText)
-                                                                    ) // PK_DecryptorFilter
-    ); // StringSource
+
+    StringSource(cipherText, true,
+                 new PK_DecryptorFilter(rng, decryptor,
+                                        new StringSink(recoveredText)
+                                                )
+    );
+
     return recoveredText;
 }
 
-int main() {
-    const std::string publicKeyFileName = "rsa_public_key.pem";
-    const std::string privateKeyFileName = "rsa_private_key.pem";
 
-    // 生成并保存密钥对
-    GenerateAndSaveKeys(publicKeyFileName, privateKeyFileName);
+int main(int argc, char* argv[])
+{
+    try
+    {
+        RSA::PrivateKey privateKey;
+        RSA::PublicKey publicKey;
 
-    // 加载公钥和私钥
-    CryptoPP::RSA::PublicKey publicKey = LoadPublicKey(publicKeyFileName);
-    CryptoPP::RSA::PrivateKey privateKey = LoadPrivateKey(privateKeyFileName);
+        // 生成RSA密钥对
+        GenerateRSAKeyPair(privateKey, publicKey);
 
-    // 待加密的明文
-    std::string message = "Hello, this is a secret message!";
-    std::cout << "Original Message: " << message << std::endl;
+        // 待加密的文本
+        std::string plainText = "Hello, world !";
 
-    // 加密
-    std::string encrypted = Encrypt(message, publicKey);
-    std::cout << "Encrypted Message: " << encrypted << std::endl;
+        std::cout << "plainText: " << plainText << std::endl;
 
-    // 解密
-    std::string decrypted = Decrypt(encrypted, privateKey);
-    std::cout << "Decrypted Message: " << decrypted << std::endl;
+        // RSA加密
+        std::string cipherText = RSAEncrypt(publicKey, plainText);
+        std::cout << "Cipher Text: " << cipherText << std::endl;
+
+        // RSA解密
+        std::string recoveredText = RSADecrypt(privateKey, cipherText);
+        std::cout << "Recovered Text: " << recoveredText << std::endl;
+    }
+    catch (CryptoPP::Exception& e)
+    {
+        std::cerr << "Crypto++ Exception: " << e.what() << std::endl;
+        return 1;
+    }
 
     return 0;
 }
+
