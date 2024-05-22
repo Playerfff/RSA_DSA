@@ -1,16 +1,15 @@
 #include <iostream>
 
-#include <cryptopp/rsa.h>
-#include <cryptopp/osrng.h>
 #include <cryptopp/base64.h>
+#include <cryptopp/osrng.h>
+#include <cryptopp/rsa.h>
 
 using namespace std;
 using namespace CryptoPP;
 
 
 // 生成RSA密钥对
-void GenerateRSAKeyPair(RSA::PrivateKey& privateKey, RSA::PublicKey& publicKey)
-{
+void GenerateRSAKeyPair(RSA::PrivateKey &privateKey, RSA::PublicKey &publicKey) {
     AutoSeededRandomPool rng;
 
     InvertibleRSAFunction parameters;
@@ -21,8 +20,7 @@ void GenerateRSAKeyPair(RSA::PrivateKey& privateKey, RSA::PublicKey& publicKey)
 }
 
 // RSA加密
-std::string RSAEncrypt(const RSA::PublicKey& publicKey, const std::string& plainText)
-{
+std::string RSAEncrypt(const RSA::PublicKey &publicKey, const std::string &plainText) {
     AutoSeededRandomPool rng;
     RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
 
@@ -30,16 +28,13 @@ std::string RSAEncrypt(const RSA::PublicKey& publicKey, const std::string& plain
 
     StringSource(plainText, true,
                  new PK_EncryptorFilter(rng, encryptor,
-                                        new StringSink(cipherText)
-                                                )
-    );
+                                        new StringSink(cipherText)));
 
     return cipherText;
 }
 
 // RSA解密
-std::string RSADecrypt(const RSA::PrivateKey& privateKey, const std::string& cipherText)
-{
+std::string RSADecrypt(const RSA::PrivateKey &privateKey, const std::string &cipherText) {
     AutoSeededRandomPool rng;
     RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
 
@@ -47,18 +42,14 @@ std::string RSADecrypt(const RSA::PrivateKey& privateKey, const std::string& cip
 
     StringSource(cipherText, true,
                  new PK_DecryptorFilter(rng, decryptor,
-                                        new StringSink(recoveredText)
-                                                )
-    );
+                                        new StringSink(recoveredText)));
 
     return recoveredText;
 }
 
 
-int main(int argc, char* argv[])
-{
-    try
-    {
+int main(int argc, char *argv[]) {
+    try {
         RSA::PrivateKey privateKey;
         RSA::PublicKey publicKey;
 
@@ -77,13 +68,10 @@ int main(int argc, char* argv[])
         // RSA解密
         std::string recoveredText = RSADecrypt(privateKey, cipherText);
         std::cout << "Recovered Text: " << recoveredText << std::endl;
-    }
-    catch (CryptoPP::Exception& e)
-    {
+    } catch (CryptoPP::Exception &e) {
         std::cerr << "Crypto++ Exception: " << e.what() << std::endl;
         return 1;
     }
 
     return 0;
 }
-

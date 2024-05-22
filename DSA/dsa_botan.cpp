@@ -1,65 +1,61 @@
 #include <botan/auto_rng.h>
-#include <botan/dsa.h>
-#include <botan/pem.h>
-#include <botan/hex.h>
-#include <botan/pubkey.h>
 #include <botan/dl_group.h>
-#include <botan/der_enc.h>
+#include <botan/dsa.h>
+#include <botan/hash.h>
+#include <botan/hex.h>
+#include <botan/pem.h>
+#include <botan/pkcs8.h>
 #include <botan/pubkey.h>
+#include <botan/x509_key.h>
 #include <iostream>
-#include <memory>
+#include <vector>
 
-// 生成DSA密钥对
-void GenerateDSAKeys(std::unique_ptr<Botan::Private_Key>& privateKey, std::unique_ptr<Botan::Public_Key>& publicKey) {
-    Botan::AutoSeeded_RNG rng;
-    Botan::DL_Group group(rng, Botan::DL_Group::DSA_Kosherizer, 2048);
-    privateKey = std::make_unique<Botan::DSA_PrivateKey>(rng, group);
-    publicKey = std::make_unique<Botan::DSA_PublicKey>(dynamic_cast<Botan::DSA_PrivateKey&>(*privateKey));
-}
-
-// 使用私钥对消息进行签名
-std::vector<uint8_t> SignMessage(const Botan::DSA_PrivateKey& privateKey, const std::string& message) {
-    Botan::AutoSeeded_RNG rng;
-    std::vector<uint8_t> messageVec(message.begin(), message.end());
-    Botan::PK_Signer signer(privateKey, rng, "EMSA1(SHA-256)");
-    return signer.sign_message(messageVec, rng);
-}
-
-// 使用公钥验证签名
-bool VerifyMessage(const Botan::DSA_PublicKey& publicKey, const std::string& message, const std::vector<uint8_t>& signature) {
-    std::vector<uint8_t> messageVec(message.begin(), message.end());
-    Botan::PK_Verifier verifier(publicKey, "EMSA1(SHA-256)");
-    return verifier.verify_message(messageVec, signature);
+void handle_errors(const std::string &msg) {
+    std::cerr << "Error: " << msg << std::endl;
+    exit(1);
 }
 
 int main() {
     try {
+        // 初始化随机数生成器
+        Botan::AutoSeeded_RNG rng;
+
+        // 生成DSA参数
+        Botan::DL_Group group("dsa/botan/2048");
+
         // 生成DSA密钥对
-        std::unique_ptr<Botan::Private_Key> privateKey;
-        std::unique_ptr<Botan::Public_Key> publicKey;
-        GenerateDSAKeys(privateKey, publicKey);
+        Botan::DSA_PrivateKey private_key(rng, group);
+        Botan::DSA_PublicKey public_key = private_key;
 
-        // 保存公钥
-        std::vector<uint8_t> pubKeyDER;
-        Botan::DER_Encoder derEncoder(pubKeyDER);
-        publicKey->encode(derEncoder);
-        std::string pubKeyPEM = Botan::PEM_Code::encode(pubKeyDER, "DSA PUBLIC KEY");
-        std::cout << "Public Key: " << std::endl << pubKeyPEM << std::endl;
+        // 获取私钥和公钥的PEM格式字符串
+        std::string private_key_pem = Botan::PKCS8::PEM_encode(private_key);
+        std::string public_key_pem = Botan::X509::PEM_encode(public_key);
 
-        // 待签名的消息
-        std::string message = "This is a test message.";
+        // 打印私钥和公钥
+        std::cout << "Private Key:\n" << private_key_pem << std::endl;
+        std::cout << "Public Key:\n" << public_key_pem << std::endl;
 
-        // 使用私钥对消息进行签名
-        std::vector<uint8_t> signature = SignMessage(dynamic_cast<Botan::DSA_PrivateKey&>(*privateKey), message);
-        std::string encodedSignature = Botan::hex_encode(signature);
-        std::cout << "Signature: " << encodedSignature << std::endl;
+        // 要签名的消息
+        std::string message = "Hello, Botan DSA!";
 
-        // 使用公钥验证签名
-        bool result = VerifyMessage(dynamic_cast<Botan::DSA_PublicKey&>(*publicKey), message, signature);
-        std::cout << "Signature is " << (result ? "valid" : "invalid") << std::endl;
-    } catch (std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
-        return 1;
+        // 计算消息的哈希值
+        const auto hash = Botan::HashFunction::create_or_throw("SHA-256");
+        auto message_hash = hash->process(message);
+
+        // 签名消息
+        Botan::PK_Signer signer(private_key, rng, "EMSA1(SHA-256)");
+        std::vector<uint8_t> signature = signer.sign_message(message_hash, rng);
+
+        std::cout << "Signature: " << Botan::hex_encode(signature) << std::endl;
+
+        // 验证签名
+        Botan::PK_Verifier verifier(public_key, "EMSA1(SHA-256)");
+        bool valid = verifier.verify_message(message_hash, signature);
+
+        std::cout << "Signature is " << (valid ? "valid" : "invalid") << std::endl;
+
+    } catch (std::exception &e) {
+        handle_errors(e.what());
     }
 
     return 0;

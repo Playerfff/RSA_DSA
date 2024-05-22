@@ -1,7 +1,10 @@
 #include <iostream>
+#include <vector>
+#include <cmath>
+#include <random>
+#include <tuple>
 
-// 判断一个数是否为素数
-bool isPrime(int n) {
+bool is_prime(int n) {
     if (n <= 1) return false;
     if (n <= 3) return true;
     if (n % 2 == 0 || n % 3 == 0) return false;
@@ -11,81 +14,95 @@ bool isPrime(int n) {
     return true;
 }
 
-// 求模反元素
-int modInverse(int a, int m) {
-    int m0 = m, t, q;
-    int x0 = 0, x1 = 1;
+int generate_prime(int min, int max) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(min, max);
+    int prime;
+    do {
+        prime = dis(gen);
+    } while (!is_prime(prime));
+    return prime;
+}
 
-    if (m == 1) return 0;
-
-    // 应用扩展欧几里得算法
-    while (a > 1) {
-        // q 是商， t 是余数
-        q = a / m;
-        t = m;
-
-        // m 是余数， a 是除数
-        m = a % m;
-        a = t;
-
-        // 更新 x 和 y
-        t = x0;
-        x0 = x1 - q * x0;
-        x1 = t;
+int gcd(int a, int b) {
+    while (b != 0) {
+        int temp = b;
+        b = a % b;
+        a = temp;
     }
-
-    // 保证 x1 为正数
-    if (x1 < 0) x1 += m0;
-    return x1;
+    return a;
 }
 
-// 快速幂取模运算
-int powerMod(int base, int exp, int mod) {
-    if (exp == 0) return 1;
-    int half = powerMod(base, exp / 2, mod);
-    int half_mod = (1LL * half * half) % mod;
-    if (exp % 2 != 0) {
-        return (1LL * half_mod * base) % mod;
-    } else {
-        return half_mod;
+std::tuple<int, int, int> extended_gcd(int a, int b) {
+    if (b == 0) return std::make_tuple(a, 1, 0);
+    auto [g, x1, y1] = extended_gcd(b, a % b);
+    int x = y1;
+    int y = x1 - (a / b) * y1;
+    return std::make_tuple(g, x, y);
+}
+
+int mod_inverse(int e, int phi) {
+    auto [g, x, y] = extended_gcd(e, phi);
+    if (g != 1) throw std::runtime_error("Inverse doesn't exist");
+    return (x % phi + phi) % phi;
+}
+
+long long mod_pow(long long base, long long exp, long long mod) {
+    long long result = 1;
+    while (exp > 0) {
+        if (exp % 2 == 1) {
+            result = (result * base) % mod;
+        }
+        base = (base * base) % mod;
+        exp /= 2;
     }
+    return result;
 }
 
-// RSA 加密
-int encrypt(int msg, int e, int n) {
-    return powerMod(msg, e, n);
-}
+struct RSAKeyPair {
+    int e, d, n;
+};
 
-// RSA 解密
-int decrypt(int msg, int d, int n) {
-    return powerMod(msg, d, n);
-}
+RSAKeyPair generate_rsa_keys(int bit_length) {
+    int min = 1 << (bit_length / 2 - 1);
+    int max = 1 << (bit_length / 2);
 
-int main() {
-    // 选择两个不同的素数 p 和 q
-    int p = 11;
-    int q = 13;
-
-    // 计算模数 n 和欧拉函数 phi(n)
+    int p = generate_prime(min, max);
+    int q = generate_prime(min, max);
     int n = p * q;
     int phi = (p - 1) * (q - 1);
 
-    // 选择指数 e，确保与 phi 互质
-    int e = 7;
+    int e = 65537; // 常用的公钥指数
+    if (gcd(e, phi) != 1) throw std::runtime_error("e is not coprime with phi");
 
-    // 计算 d，即 e 的模反元素
-    int d = modInverse(e, phi);
+    int d = mod_inverse(e, phi);
+    return {e, d, n};
+}
 
-    // 明文
-    int msg = 9;
+int encrypt(int message, int e, int n) {
+    return mod_pow(message, e, n);
+}
 
-    // 加密明文
-    int encrypted_msg = encrypt(msg, e, n);
-    std::cout << "Encrypted message: " << encrypted_msg << std::endl;
+int decrypt(int ciphertext, int d, int n) {
+    return mod_pow(ciphertext, d, n);
+}
 
-    // 解密密文
-    int decrypted_msg = decrypt(encrypted_msg, d, n);
-    std::cout << "Decrypted message: " << decrypted_msg << std::endl;
+int main() {
+    int bit_length = 16; // 简化为16位，实际应用应至少使用2048位
+    RSAKeyPair keys = generate_rsa_keys(bit_length);
+
+    std::cout << "Public Key (e, n): (" << keys.e << ", " << keys.n << ")\n";
+    std::cout << "Private Key (d, n): (" << keys.d << ", " << keys.n << ")\n";
+
+    int message = 42; // 示例消息
+    int encrypted_message = encrypt(message, keys.e, keys.n);
+    int decrypted_message = decrypt(encrypted_message, keys.d, keys.n);
+
+    std::cout << "Original Message: " << message << "\n";
+    std::cout << "Encrypted Message: " << encrypted_message << "\n";
+    std::cout << "Decrypted Message: " << decrypted_message << "\n";
 
     return 0;
 }
+

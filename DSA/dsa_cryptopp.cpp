@@ -1,13 +1,13 @@
-#include <iostream>
-#include <cryptopp/osrng.h>
 #include <cryptopp/dsa.h>
-#include <cryptopp/hex.h>
-#include <cryptopp/filters.h>
 #include <cryptopp/files.h>
+#include <cryptopp/filters.h>
+#include <cryptopp/hex.h>
+#include <cryptopp/osrng.h>
+#include <iostream>
 
 using namespace CryptoPP;
 
-void GenerateDSAKeys(DSA::PrivateKey& privateKey, DSA::PublicKey& publicKey) {
+void GenerateDSAKeys(DSA::PrivateKey &privateKey, DSA::PublicKey &publicKey) {
     AutoSeededRandomPool rng;
 
     // Generate DSA parameters
@@ -15,30 +15,28 @@ void GenerateDSAKeys(DSA::PrivateKey& privateKey, DSA::PublicKey& publicKey) {
     privateKey.MakePublicKey(publicKey);
 }
 
-std::string SignMessage(const DSA::PrivateKey& privateKey, const std::string& message) {
+std::string SignMessage(const DSA::PrivateKey &privateKey, const std::string &message) {
     AutoSeededRandomPool rng;
     DSA::Signer signer(privateKey);
 
     std::string signature;
     StringSource ss1(message, true,
                      new SignerFilter(rng, signer,
-                                      new StringSink(signature)
-                                              ) // SignerFilter
-    ); // StringSource
+                                      new StringSink(signature))// SignerFilter
+    );                                                          // StringSource
 
     return signature;
 }
 
-bool VerifyMessage(const DSA::PublicKey& publicKey, const std::string& message, const std::string& signature) {
+bool VerifyMessage(const DSA::PublicKey &publicKey, const std::string &message, const std::string &signature) {
     DSA::Verifier verifier(publicKey);
 
     bool result = false;
     StringSource ss2(signature + message, true,
                      new SignatureVerificationFilter(
                              verifier,
-                             new ArraySink((byte*)&result, sizeof(result))
-                                     ) // SignatureVerificationFilter
-    ); // StringSource
+                             new ArraySink((byte *) &result, sizeof(result)))// SignatureVerificationFilter
+    );                                                                       // StringSource
 
     return result;
 }

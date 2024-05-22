@@ -1,56 +1,108 @@
-#include <cstring>
-#include <iostream>
-#include <openssl/err.h>
-#include <openssl/pem.h>
 #include <openssl/rsa.h>
+#include <openssl/pem.h>
+#include <openssl/err.h>
+#include <iostream>
+#include <string>
 
-void printErrorAndExit(const char *msg) {
+// 该函数用于处理OpenSSL错误，将错误信息打印到标准错误输出，并终止程序。
+void handleErrors() {
     ERR_print_errors_fp(stderr);
-    std::cerr << msg << std::endl;
-    exit(EXIT_FAILURE);
+    abort();
+}
+
+RSA* generateKeyPair() {
+    int bits = 2048;
+    unsigned long e = RSA_F4;
+    BIGNUM* bne = BN_new();
+    if (!BN_set_word(bne, e)) {
+        handleErrors();
+    }
+
+    RSA* rsa = RSA_new();
+    if (!RSA_generate_key_ex(rsa, bits, bne, NULL)) {
+        handleErrors();
+    }
+
+    BN_free(bne);
+    return rsa;
+}
+
+std::string rsaEncrypt(RSA* rsa, const std::string& plaintext) {
+    std::string ciphertext(RSA_size(rsa), '\0');
+    int len = RSA_public_encrypt(plaintext.size(), (const unsigned char*)plaintext.c_str(),
+                                 (unsigned char*)ciphertext.c_str(), rsa, RSA_PKCS1_OAEP_PADDING);
+    if (len == -1) {
+        handleErrors();
+    }
+    return ciphertext;
+}
+
+std::string rsaDecrypt(RSA* rsa, const std::string& ciphertext) {
+    std::string plaintext(RSA_size(rsa), '\0');
+    int len = RSA_private_decrypt(ciphertext.size(), (const unsigned char*)ciphertext.c_str(),
+                                  (unsigned char*)plaintext.c_str(), rsa, RSA_PKCS1_OAEP_PADDING);
+    if (len == -1) {
+        handleErrors();
+    }
+    plaintext.resize(len);
+    return plaintext;
 }
 
 int main() {
-    // 初始化 OpenSSL 库
+    // Initialize OpenSSL
     OpenSSL_add_all_algorithms();
+    ERR_load_BIO_strings();
     ERR_load_crypto_strings();
 
-    // 生成RSA密钥对
-    RSA *rsa = RSA_new();
-    if (rsa == NULL) printErrorAndExit("Failed to create RSA object");
+    // Generate RSA key pair
+    RSA* rsa = generateKeyPair();
+    if (!rsa) {
+        std::cerr << "Key pair generation failed" << std::endl;
+        return 1;
+    }
 
-    // 生成密钥的参数，例如位数等可以根据需求调整
-    BIGNUM *bn = BN_new();
-    if (bn == NULL) printErrorAndExit("Failed to create BIGNUM object");
-    if (!BN_set_word(bn, RSA_F4)) printErrorAndExit("Failed to set public exponent");
+    // Display keys
+    BIO* bp_public = BIO_new(BIO_s_mem());
+    BIO* bp_private = BIO_new(BIO_s_mem());
+    PEM_write_bio_RSAPublicKey(bp_public, rsa);
+    PEM_write_bio_RSAPrivateKey(bp_private, rsa, NULL, NULL, 0, NULL, NULL);
 
-    // 生成RSA密钥对
-    if (RSA_generate_key_ex(rsa, 2048, bn, NULL) != 1)
-        printErrorAndExit("Failed to generate RSA key pair");
+    size_t pub_len = BIO_pending(bp_public);
+    size_t priv_len = BIO_pending(bp_private);
 
-    // 公钥加密
-    const char *plaintext = "Hello, OpenSSL RSA!";
-    unsigned char encrypted[RSA_size(rsa)];
-    int encrypted_len = RSA_public_encrypt(strlen(plaintext) + 1, reinterpret_cast<const unsigned char *>(plaintext), encrypted, rsa, RSA_PKCS1_PADDING);
-    if (encrypted_len == -1) printErrorAndExit("Encryption failed");
+    char* pub_key = (char*)malloc(pub_len + 1);
+    char* priv_key = (char*)malloc(priv_len + 1);
 
-    // 私钥解密
-    unsigned char decrypted[encrypted_len];
-    int decrypted_len = RSA_private_decrypt(encrypted_len, encrypted, decrypted, rsa, RSA_PKCS1_PADDING);
-    if (decrypted_len == -1) printErrorAndExit("Decryption failed");
+    BIO_read(bp_public, pub_key, pub_len);
+    BIO_read(bp_private, priv_key, priv_len);
 
-    decrypted[decrypted_len] = '\0';// 添加结束符
-    std::cout << "Original message: " << plaintext << std::endl;
-    std::cout << "Encrypted message: ";
-    for (int i = 0; i < encrypted_len; ++i) std::cout << std::hex << static_cast<int>(encrypted[i]);
-    std::cout << std::endl;
-    std::cout << "Decrypted message: " << reinterpret_cast<char *>(decrypted) << std::endl;
+    pub_key[pub_len] = '\0';
+    priv_key[priv_len] = '\0';
 
-    // 清理
+    std::cout << "Public Key: " << std::endl << pub_key << std::endl;
+    std::cout << "Private Key: " << std::endl << priv_key << std::endl;
+
+    // Clean up
+    BIO_free_all(bp_public);
+    BIO_free_all(bp_private);
+    free(pub_key);
+    free(priv_key);
+
+    // Encrypt message
+    std::string plaintext = "Hello, OpenSSL RSA!";
+    std::string ciphertext = rsaEncrypt(rsa, plaintext);
+    std::cout << "Encrypted: " << ciphertext << std::endl;
+
+    // Decrypt message
+    std::string decryptedtext = rsaDecrypt(rsa, ciphertext);
+    std::cout << "Decrypted: " << decryptedtext << std::endl;
+
+    // Free RSA key
     RSA_free(rsa);
-    BN_free(bn);
-    EVP_cleanup();
+
+    // Clean up OpenSSL
     CRYPTO_cleanup_all_ex_data();
+    ERR_free_strings();
 
     return 0;
 }
