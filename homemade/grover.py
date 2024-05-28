@@ -1,47 +1,46 @@
 import numpy as np
-from qiskit import QuantumCircuit, Aer, transpile, assemble, execute
-from qiskit.visualization import plot_histogram
 
-def grover_circuit(n, oracle):
-    circuit = QuantumCircuit(n)
-    
-    # Step 1: Initialize superposition
-    circuit.h(range(n))
-    
-    # Define Grover iteration
-    def grover_iteration():
-        # Apply Oracle
-        circuit.append(oracle, range(n))
-        
-        # Apply Grover diffusion operator
-        circuit.h(range(n))
-        circuit.x(range(n))
-        circuit.h(n-1)
-        circuit.mct(list(range(n-1)), n-1)  # multi-controlled Toffoli
-        circuit.h(n-1)
-        circuit.x(range(n))
-        circuit.h(range(n))
+# 定义参数
+p = 23  # 素数
+g = 5   # 基
+y = 8   # 目标值
+n = int(np.ceil(np.log2(p)))  # 所需量子比特数
+print(f"离散对数问题: 求x使得g^x ≡ y (mod p), 其中g={g}, y={y}, p={p}")
 
-    # Step 3: Apply Grover iterations
-    num_iterations = int(np.pi/4 * np.sqrt(2**n))
-    for _ in range(num_iterations):
-        grover_iteration()
+# 初始化量子态, 创建一个均匀叠加态，即所有态的幅度相等。
+state = np.ones(2 ** n) / np.sqrt(2 ** n)  # 均匀叠加态
 
-    # Step 5: Measure
-    circuit.measure_all()
-    return circuit
 
-# Example usage
-n = 3  # Number of qubits
-oracle = QuantumCircuit(n)
-oracle.cz(0, n-1)  # Example oracle marking |101> state
+# 构建Oracle
+def oracle(state, p, g, y, n):
+    for x in range(2 ** n):
+        if pow(g, x, p) == y:
+            state[x] = -state[x]  # oracle翻转目标态的相位，而其他态保持不变
+    return state
 
-grover_circ = grover_circuit(n, oracle)
-simulator = Aer.get_backend('qasm_simulator')
-compiled_circ = transpile(grover_circ, simulator)
-qobj = assemble(compiled_circ)
-result = execute(grover_circ, backend=simulator, shots=1024).result()
-counts = result.get_counts()
 
-print("Measurement results:", counts)
-plot_histogram(counts)
+# 扩散算子, 放大目标态的变化
+def diffusion_operator(state, n):
+    mean = np.mean(state)
+    state = 2 * mean - state
+    return state
+
+
+# Grover迭代次数
+num_iterations = int(np.pi / 4 * np.sqrt(2 ** n))
+
+# 应用Grover迭代
+for _ in range(num_iterations):
+    state = oracle(state, p, g, y, n)
+    state = diffusion_operator(state, n)
+
+
+# 测量并解码结果
+def measure(state):
+    probabilities = np.abs(state) ** 2
+    most_likely_index = np.argmax(probabilities)
+    return most_likely_index
+
+
+result = measure(state)
+print(f'Found x: {result}, such that {g}^{result} ≡ {y} (mod {p})')
