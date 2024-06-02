@@ -42,7 +42,7 @@ std::string rsaEncrypt(RSA* rsa, const std::string& plaintext) {
 
 std::string rsaDecrypt(RSA* rsa, const std::string& ciphertext) {
     std::string plaintext(RSA_size(rsa), '\0');
-    // 公钥解密
+    // 私钥解密
     int len = RSA_private_decrypt(ciphertext.size(), (const unsigned char*)ciphertext.c_str(),
                                   (unsigned char*)plaintext.c_str(), rsa, RSA_PKCS1_OAEP_PADDING);
     if (len == -1) {
